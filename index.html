@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>分析看板</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0d1117;--card:#161b22;--border:#21262d;--text:#e6edf3;--text2:#8b949e;--blue:#58a6ff;--green:#3fb950;--yellow:#d29922;--red:#f85149;--purple:#a371f7}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;font-size:14px;line-height:1.5}
+.container{max-width:1440px;margin:0 auto;padding:12px 20px}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);margin-bottom:16px;position:sticky;top:0;background:rgba(13,17,23,.95);backdrop-filter:blur(10px);z-index:100}
+.header h1{font-size:16px;color:var(--blue)}
+.header .status{font-size:11px;color:var(--green)}
+.header .user-info{display:flex;align-items:center;gap:10px}
+.header .user-email{font-size:11px;color:var(--text2)}
+.header .logout-btn{padding:4px 10px;font-size:11px;border:1px solid #30363d;border-radius:5px;background:transparent;color:var(--text2);cursor:pointer}
+.header .logout-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* 登录页面样式 */
+.login-container{display:flex;justify-content:center;align-items:center;min-height:100vh;background:var(--bg)}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px;width:100%;max-width:400px;text-align:center}
+.login-box h2{font-size:24px;color:var(--blue);margin-bottom:8px}
+.login-box .subtitle{font-size:13px;color:var(--text2);margin-bottom:32px}
+.login-form{display:flex;flex-direction:column;gap:16px}
+.login-input{padding:12px 16px;font-size:14px;border:1px solid #30363d;border-radius:8px;background:var(--bg);color:var(--text);outline:none;transition:border-color .2s}
+.login-input:focus{border-color:var(--blue)}
+.login-input::placeholder{color:var(--text2)}
+.login-btn{padding:12px;font-size:14px;font-weight:600;border:none;border-radius:8px;background:var(--blue);color:#fff;cursor:pointer;transition:opacity .2s}
+.login-btn:hover{opacity:.9}
+.login-btn:disabled{opacity:.5;cursor:not-allowed}
+.login-error{font-size:12px;color:var(--red);margin-top:8px;min-height:18px}
+.login-footer{margin-top:24px;font-size:11px;color:var(--text2)}
+
+/* 验证码输入样式 */
+.code-input-group{display:flex;gap:8px;justify-content:center}
+.code-input{width:40px;height:48px;font-size:20px;font-weight:700;text-align:center;border:1px solid #30363d;border-radius:8px;background:var(--bg);color:var(--text);outline:none;transition:border-color .2s}
+.code-input:focus{border-color:var(--blue)}
+.resend-btn{padding:8px 16px;font-size:12px;border:1px solid #30363d;border-radius:6px;background:transparent;color:var(--text2);cursor:pointer}
+.resend-btn:hover{border-color:var(--blue);color:var(--blue)}
+.resend-btn:disabled{opacity:.5;cursor:not-allowed}
+.step-indicator{display:flex;justify-content:center;gap:8px;margin-bottom:24px}
+.step{width:8px;height:8px;border-radius:50%;background:#30363d}
+.step.active{background:var(--blue)}
+
+.nav{display:flex;gap:4px;margin-bottom:16px;padding:8px;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow-x:auto}
+.nav a{color:var(--text2);text-decoration:none;font-size:12px;padding:8px 14px;border-radius:6px;white-space:nowrap;transition:all .15s}
+.nav a:hover{background:rgba(88,166,255,.1);color:var(--text)}
+.nav a.active{background:var(--blue);color:#fff}
+.filters{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:10px}
+.filter-group{display:flex;align-items:center;gap:6px}
+.filter-label{font-size:11px;color:var(--text2);font-weight:600}
+.filter-btn{padding:4px 10px;font-size:11px;border:1px solid #30363d;border-radius:5px;background:transparent;color:var(--text2);cursor:pointer;transition:all .15s}
+.filter-btn:hover{border-color:var(--blue);color:var(--text)}
+.filter-btn.active{background:#1f6feb;border-color:#1f6feb;color:#fff}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;border-top:3px solid var(--blue)}
+.stat-card.green{border-top-color:var(--green)}
+.stat-card.yellow{border-top-color:var(--yellow)}
+.stat-card.red{border-top-color:var(--red)}
+.stat-card.purple{border-top-color:var(--purple)}
+.stat-card .label{font-size:10px;color:var(--text2);letter-spacing:.5px;margin-bottom:2px}
+.stat-card .value{font-size:24px;font-weight:800;line-height:1.2}
+.stat-card .value.xl{font-size:30px}
+.stat-card .sub{font-size:10px;color:var(--text2);margin-top:2px}
+.section{margin-bottom:24px}
+.section-title{font-size:16px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-title .bar{width:3px;height:16px;background:var(--blue);border-radius:2px}
+.section-title .sub{font-size:11px;color:var(--text2);font-weight:400}
+.section-divider{height:1px;background:linear-gradient(90deg,var(--border),transparent);margin:24px 0}
+.page-label{text-align:center;margin:8px 0 4px;font-size:10px;color:#30363d;letter-spacing:2px}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.chart-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px}
+.chart-box .title{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px}
+.chart{width:100%;height:280px}
+.chart.tall{height:360px}
+.chart.sm{height:220px}
+.chart-box.full{grid-column:1/-1}
+.table-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;overflow-x:auto;margin-bottom:12px}
+.table-box .title{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{padding:7px 5px;text-align:left;color:var(--text2);border-bottom:2px solid var(--border);font-weight:600;white-space:nowrap}
+th.right,td.right{text-align:right}
+th.center,td.center{text-align:center}
+td{padding:7px 5px;border-bottom:1px solid var(--border);white-space:nowrap}
+.rank-1,.rank-2,.rank-3{color:var(--yellow);font-weight:700}
+.green{color:var(--green)}.yellow{color:var(--yellow)}.red{color:var(--red)}.blue{color:var(--blue)}
+.review-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.review-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.review-card h3{font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.review-card ul{list-style:none}
+.review-card li{padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;color:#c9d1d9;line-height:1.4;display:flex;align-items:flex-start;gap:4px}
+.review-card li:last-child{border:none}
+.tag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;white-space:nowrap}
+.tag.g{background:#1b3624;color:var(--green)}
+.tag.y{background:#362e1b;color:var(--yellow)}
+.tag.b{background:#1b2d36;color:var(--blue)}
+@media(max-width:900px){.charts,.review-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.header{flex-direction:column;gap:6px;align-items:flex-start}.filters{flex-direction:column}.filter-group{flex-wrap:wrap}.nav{flex-wrap:nowrap;overflow-x:auto}}
+</style>
+</head>
+<body>
+
+<!-- 登录页面 -->
+<div class="login-container" id="loginPage">
+  <div class="login-box">
+    <h2>分析看板</h2>
+    <div class="subtitle" id="loginSubtitle">请输入授权邮箱获取验证码</div>
+    
+    <!-- 步骤指示器 -->
+    <div class="step-indicator">
+      <div class="step active" id="step1"></div>
+      <div class="step" id="step2"></div>
+    </div>
+    
+    <!-- 步骤1：输入邮箱 -->
+    <div class="login-form" id="emailStep">
+      <input type="email" class="login-input" id="emailInput" placeholder="请输入邮箱地址" autocomplete="email">
+      <button class="login-btn" id="sendCodeBtn" onclick="handleSendCode()">获取验证码</button>
+      <div class="login-error" id="emailError"></div>
+    </div>
+    
+    <!-- 步骤2：输入验证码（默认隐藏） -->
+    <div class="login-form" id="codeStep" style="display:none">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:8px">
+        验证码已发送至：<span id="maskedEmail" style="color:var(--blue)"></span>
+      </div>
+      <div class="code-input-group">
+        <input type="text" class="code-input" maxlength="1" oninput="onCodeInput(this, 0)" onkeydown="onCodeKeydown(this, 0)">
+        <input type="text" class="code-input" maxlength="1" oninput="onCodeInput(this, 1)" onkeydown="onCodeKeydown(this, 1)">
+        <input type="text" class="code-input" maxlength="1" oninput="onCodeInput(this, 2)" onkeydown="onCodeKeydown(this, 2)">
+        <input type="text" class="code-input" maxlength="1" oninput="onCodeInput(this, 3)" onkeydown="onCodeKeydown(this, 3)">
+        <input type="text" class="code-input" maxlength="1" oninput="onCodeInput(this, 4)" onkeydown="onCodeKeydown(this, 4)">
+        <input type="text" class="code-input" maxlength="1" oninput="onCodeInput(this, 5)" onkeydown="onCodeKeydown(this, 5)">
+      </div>
+      <button class="login-btn" id="verifyBtn" onclick="handleVerifyCode()">验证登录</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <button class="resend-btn" id="resendBtn" onclick="handleSendCode()" disabled>重新发送(60s)</button>
+        <button class="resend-btn" onclick="showEmailStep()">返回</button>
+      </div>
+      <div class="login-error" id="codeError"></div>
+    </div>
+    
+    <div class="login-footer">如需授权请联系：davidliu@west-hn.com</div>
+  </div>
+</div>
+
+<!-- 主页面（默认隐藏） -->
+<div class="container" id="mainPage" style="display:none">
+  <div class="header">
+    <h1>分析看板</h1>
+    <div class="user-info">
+      <span class="user-email" id="userEmail"></span>
+      <button class="logout-btn" onclick="handleLogout()">退出</button>
+    </div>
+    <div class="status" id="status">加载中...</div>
+  </div>
+
+  <div class="nav" id="mainNav">
+    <a href="#sec-overview" class="active">总览</a>
+    <a href="#sec-target">目标达成</a>
+    <a href="#sec-business">业务分析</a>
+    <a href="#sec-customer">客户分析</a>
+    <a href="#sec-product">产品分析</a>
+    <a href="#sec-review">经营复盘</a>
+  </div>
+
+  <div class="filters">
+    <div class="filter-group">
+      <span class="filter-label">年份</span>
+      <button class="filter-btn active" data-group="year" data-value="all">全部</button>
+      <button class="filter-btn" data-group="year" data-value="2025">2025</button>
+      <button class="filter-btn" data-group="year" data-value="2026">2026</button>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">季度</span>
+      <button class="filter-btn active" data-group="quarter" data-value="all">全部</button>
+      <button class="filter-btn" data-group="quarter" data-value="Q1">Q1</button>
+      <button class="filter-btn" data-group="quarter" data-value="Q2">Q2</button>
+      <button class="filter-btn" data-group="quarter" data-value="Q3">Q3</button>
+      <button class="filter-btn" data-group="quarter" data-value="Q4">Q4</button>
+    </div>
+  </div>
+
+  <div class="page-label">PAGE 01</div>
+  <div class="section" id="sec-overview">
+    <div class="section-title"><span class="bar"></span>Executive Summary <span class="sub">经营总览</span></div>
+    <div class="stats" id="kpiRow"></div>
+    <div class="charts">
+      <div class="chart-box full"><div class="title">月度销售收入额 & 毛利趋势</div><div class="chart tall" id="c1"></div></div>
+      <div class="chart-box"><div class="title">毛利率趋势</div><div class="chart" id="c2"></div></div>
+      <div class="chart-box"><div class="title">销售收入额 + 毛利率双轴图</div><div class="chart" id="c3"></div></div>
+      <div class="chart-box"><div class="title">季度销售收入额分布</div><div class="chart sm" id="c4"></div></div>
+      <div class="chart-box"><div class="title">产品销售收入额 TOP5</div><div class="chart sm" id="c5"></div></div>
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <div class="page-label">PAGE 02</div>
+  <div class="section" id="sec-target">
+    <div class="section-title"><span class="bar"></span>Target Achievement <span class="sub">目标达成分析</span></div>
+    <div class="stats" id="achGauges"></div>
+    <div class="stats" id="achMomYoy"></div>
+    <div class="charts">
+      <div class="chart-box full"><div class="title">季度目标 vs 实际（万元）</div><div class="chart" id="c9"></div></div>
+      <div class="chart-box"><div class="title">达成率趋势</div><div class="chart" id="c10"></div></div>
+      <div class="chart-box"><div class="title">2025 vs 2026 同比</div><div class="chart" id="c11"></div></div>
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <div class="page-label">PAGE 03</div>
+  <div class="section" id="sec-business">
+    <div class="section-title"><span class="bar"></span>Business Analysis <span class="sub">业务分析</span></div>
+    <div class="charts">
+      <div class="chart-box"><div class="title">业务类型销售收入额占比</div><div class="chart" id="c12"></div></div>
+      <div class="chart-box"><div class="title">业务类型毛利率对比</div><div class="chart" id="c13"></div></div>
+      <div class="chart-box full"><div class="title">TOP 10 产品销售收入额（Pareto分析）</div><div class="chart tall" id="c14"></div></div>
+      <div class="chart-box full"><div class="title">月度销售收入额增长趋势</div><div class="chart" id="c15"></div></div>
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <div class="page-label">PAGE 04</div>
+  <div class="section" id="sec-customer">
+    <div class="section-title"><span class="bar"></span>Customer Analysis <span class="sub">外贸部客户分析</span></div>
+    <div class="charts">
+      <div class="chart-box full"><div class="title">客户销售收入额 TOP10 排行榜</div><div class="chart tall" id="c19"></div></div>
+    </div>
+    <div class="table-box">
+      <div class="title">客户经营数据明细</div>
+      <div id="customerTable"></div>
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <div class="page-label">PAGE 05</div>
+  <div class="section" id="sec-product">
+    <div class="section-title"><span class="bar"></span>Product Analysis <span class="sub">产品经营质量分析</span></div>
+    <div class="charts">
+      <div class="chart-box full"><div class="title">产品四象限分析（销售收入额 × 毛利率）</div><div class="chart tall" id="c16"></div></div>
+      <div class="chart-box"><div class="title">产品毛利贡献 TOP10</div><div class="chart" id="c17"></div></div>
+      <div class="chart-box"><div class="title">产品毛利率分布</div><div class="chart" id="c18"></div></div>
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <div class="page-label">PAGE 06</div>
+  <div class="section" id="sec-review">
+    <div class="section-title"><span class="bar"></span>Business Review <span class="sub">经营复盘与行动计划</span></div>
+    <div class="review-grid">
+      <div class="review-card">
+        <h3><span style="color:var(--green)">●</span> 本季度亮点</h3>
+        <ul>
+          <li><span class="tag g">增长</span>2026 H1 累计销售收入额 53.10 万，Q2 单季 36.55 万创历史新高</li>
+          <li><span class="tag g">质量</span>2026 H1 整体毛利率 69.3%，较 2025 的 49.4% 大幅提升</li>
+          <li><span class="tag g">结构</span>高毛利服务业务贡献显著，利润超 15.06 万</li>
+          <li><span class="tag g">运营</span>Q2 销售收入额完成 36.55 万，达成率 91.4%</li>
+        </ul>
+      </div>
+      <div class="review-card">
+        <h3><span style="color:var(--yellow)">●</span> 当前关注点</h3>
+        <ul>
+          <li><span class="tag y">集中度</span>核心客户占销售收入额 90%+，需优化客户结构</li>
+          <li><span class="tag y">毛利</span>部分产品毛利率低于 40%，需报价优化</li>
+          <li><span class="tag y">节奏</span>Q2 销售收入额 36.55 万，达成率 91.4%，Q3 需继续冲刺</li>
+          <li><span class="tag y">新品</span>高毛利新品出货量低，需加大推广</li>
+        </ul>
+      </div>
+      <div class="review-card">
+        <h3><span style="color:var(--blue)">●</span> 下季度行动计划</h3>
+        <ul>
+          <li><span class="tag b">P1</span>强化 WE-T51 标准品销售，目标销售收入额 7.4 万+</li>
+          <li><span class="tag b">P2</span>优化低毛利产品报价，目标毛利率 50%+</li>
+          <li><span class="tag b">P3</span>拓展新客户渠道，降低单一依赖</li>
+          <li><span class="tag b">P4</span>推进高毛利新品量产订单</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  配置：在这里填写Cloudflare Tunnel提供的公网API地址
+// ============================================================
+// var API_BASE = 'http://localhost:8000';  // 本地测试用这个
+var API_BASE = 'https://right-showtimes-dental-burton.trycloudflare.com';  // Cloudflare隧道地址
+
+var charts = {};
+var state = {year: 'all', quarter: 'all'};
+var allData = null;
+var authToken = localStorage.getItem('authToken') || null;
+var userEmail = localStorage.getItem('userEmail') || null;
+
+// ============================================================
+//  登录功能
+// ============================================================
+var currentEmail = '';
+var resendTimer = null;
+
+function checkLogin() {
+  if (authToken) {
+    // 验证token是否有效
+    fetch(API_BASE + '/api/verify', {
+      headers: {'Authorization': 'Bearer ' + authToken}
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.valid) {
+        showMainPage();
+      } else {
+        showLoginPage();
+      }
+    }).catch(function() {
+      showLoginPage();
+    });
+  } else {
+    showLoginPage();
+  }
+}
+
+function showLoginPage() {
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('mainPage').style.display = 'none';
+  showEmailStep();
+}
+
+function showMainPage() {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('mainPage').style.display = 'block';
+  document.getElementById('userEmail').textContent = userEmail;
+  loadData();
+}
+
+function showEmailStep() {
+  document.getElementById('emailStep').style.display = 'flex';
+  document.getElementById('codeStep').style.display = 'none';
+  document.getElementById('step1').classList.add('active');
+  document.getElementById('step2').classList.remove('active');
+  document.getElementById('loginSubtitle').textContent = '请输入授权邮箱获取验证码';
+}
+
+function showCodeStep() {
+  document.getElementById('emailStep').style.display = 'none';
+  document.getElementById('codeStep').style.display = 'flex';
+  document.getElementById('step1').classList.remove('active');
+  document.getElementById('step2').classList.add('active');
+  document.getElementById('loginSubtitle').textContent = '请输入6位验证码';
+  
+  // 清空验证码输入框
+  var inputs = document.querySelectorAll('.code-input');
+  inputs.forEach(function(input) { input.value = ''; });
+  if (inputs.length > 0) inputs[0].focus();
+}
+
+function maskEmail(email) {
+  var parts = email.split('@');
+  if (parts.length !== 2) return email;
+  var name = parts[0];
+  var domain = parts[1];
+  if (name.length <= 2) return name + '***@' + domain;
+  return name.substring(0, 2) + '***@' + domain;
+}
+
+async function handleSendCode() {
+  var email = document.getElementById('emailInput').value.trim();
+  var errorEl = document.getElementById('emailError');
+  var btnEl = document.getElementById('sendCodeBtn');
+  
+  if (!email) {
+    errorEl.textContent = '请输入邮箱地址';
+    return;
+  }
+  
+  btnEl.disabled = true;
+  btnEl.textContent = '发送中...';
+  errorEl.textContent = '';
+  
+  try {
+    var resp = await fetch(API_BASE + '/api/send-code?email=' + encodeURIComponent(email), {
+      method: 'POST'
+    });
+    
+    var data = await resp.json();
+    
+    if (resp.ok && data.success) {
+      currentEmail = email;
+      document.getElementById('maskedEmail').textContent = maskEmail(email);
+      showCodeStep();
+      startResendTimer();
+    } else {
+      errorEl.textContent = data.detail || '发送失败';
+    }
+  } catch (e) {
+    errorEl.textContent = '连接失败，请检查网络';
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = '获取验证码';
+  }
+}
+
+function startResendTimer() {
+  var seconds = 60;
+  var btn = document.getElementById('resendBtn');
+  btn.disabled = true;
+  btn.textContent = '重新发送(' + seconds + 's)';
+  
+  if (resendTimer) clearInterval(resendTimer);
+  
+  resendTimer = setInterval(function() {
+    seconds--;
+    if (seconds <= 0) {
+      clearInterval(resendTimer);
+      btn.disabled = false;
+      btn.textContent = '重新发送';
+    } else {
+      btn.textContent = '重新发送(' + seconds + 's)';
+    }
+  }, 1000);
+}
+
+function onCodeInput(input, index) {
+  if (input.value.length === 1) {
+    // 自动跳转到下一个输入框
+    var inputs = document.querySelectorAll('.code-input');
+    if (index < inputs.length - 1) {
+      inputs[index + 1].focus();
+    }
+  }
+}
+
+function onCodeKeydown(input, index) {
+  if (event.key === 'Backspace' && input.value === '') {
+    // 按退格键时跳转到上一个输入框
+    var inputs = document.querySelectorAll('.code-input');
+    if (index > 0) {
+      inputs[index - 1].focus();
+    }
+  }
+}
+
+function getCode() {
+  var inputs = document.querySelectorAll('.code-input');
+  var code = '';
+  inputs.forEach(function(input) { code += input.value; });
+  return code;
+}
+
+async function handleVerifyCode() {
+  var code = getCode();
+  var errorEl = document.getElementById('codeError');
+  var btnEl = document.getElementById('verifyBtn');
+  
+  if (code.length !== 6) {
+    errorEl.textContent = '请输入6位验证码';
+    return;
+  }
+  
+  btnEl.disabled = true;
+  btnEl.textContent = '验证中...';
+  errorEl.textContent = '';
+  
+  try {
+    var resp = await fetch(API_BASE + '/api/verify-code?email=' + encodeURIComponent(currentEmail) + '&code=' + code, {
+      method: 'POST'
+    });
+    
+    var data = await resp.json();
+    
+    if (resp.ok && data.success) {
+      authToken = data.token;
+      userEmail = data.email;
+      localStorage.setItem('authToken', authToken);
+      localStorage.setItem('userEmail', userEmail);
+      showMainPage();
+    } else {
+      errorEl.textContent = data.detail || '验证失败';
+    }
+  } catch (e) {
+    errorEl.textContent = '连接失败，请检查网络';
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = '验证登录';
+  }
+}
+
+function handleLogout() {
+  authToken = null;
+  userEmail = null;
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('userEmail');
+  showLoginPage();
+}
+
+// 回车键操作
+document.getElementById('emailInput').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') handleSendCode();
+});
+
+// ============================================================
+//  数据加载
+// ============================================================
+function fmt(v) { return v == null ? '0' : Number(v).toLocaleString('zh-CN', {minimumFractionDigits: 0, maximumFractionDigits: 2}); }
+function wan(v) { return fmt(Math.round(v / 10000 * 100) / 100); }
+function pct(v) { return v == null ? '0%' : Number(v).toFixed(1) + '%'; }
+
+function initChart(id, option) {
+  var el = document.getElementById(id);
+  if (!el) return null;
+  if (charts[id]) charts[id].dispose();
+  var chart = echarts.init(el);
+  chart.setOption(option);
+  charts[id] = chart;
+  return chart;
+}
+
+function renderAll() {
+  if (!allData) return;
+  
+  var md = allData.monthly;
+  var pd = allData.products;
+  var bd = allData.business_types;
+  var cd = allData.customers;
+  var td = allData.targets;
+  
+  var totalRev = md.revenue.reduce(function(a,b){return a+b}, 0);
+  var totalProf = md.profit.reduce(function(a,b){return a+b}, 0);
+  var totalMargin = totalRev > 0 ? totalProf / totalRev * 100 : 0;
+  
+  var kpiHtml = '';
+  kpiHtml += '<div class="stat-card"><div class="label">累计销售收入额</div><div class="value">' + wan(totalRev) + ' 万</div><div class="sub">¥ ' + fmt(totalRev) + '</div></div>';
+  kpiHtml += '<div class="stat-card green"><div class="label">累计毛利</div><div class="value">' + wan(totalProf) + ' 万</div><div class="sub">毛利率 ' + pct(totalMargin) + '</div></div>';
+  kpiHtml += '<div class="stat-card yellow"><div class="label">综合毛利率</div><div class="value">' + pct(totalMargin) + '</div><div class="sub">' + md.months.length + ' 个月</div></div>';
+  kpiHtml += '<div class="stat-card purple"><div class="label">客户数</div><div class="value">' + cd.length + '</div><div class="sub">TOP: ' + (cd[0] ? cd[0].name : '-') + '</div></div>';
+  document.getElementById('kpiRow').innerHTML = kpiHtml;
+  
+  initChart('c1', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'axis', axisPointer: {type: 'cross'}},
+    legend: {data: ['销售收入额', '毛利'], textStyle: {color: '#8b949e'}, bottom: 0},
+    grid: {left: 60, right: 20, bottom: 40, top: 20},
+    xAxis: {type: 'category', data: md.months, axisLabel: {color: '#8b949e', fontSize: 10, rotate: 30}, axisLine: {lineStyle: {color: '#30363d'}}},
+    yAxis: {type: 'value', axisLabel: {color: '#8b949e', fontSize: 10, formatter: function(v){return v >= 10000 ? Math.round(v/10000) + '万' : v}}, splitLine: {lineStyle: {color: '#21262d'}}},
+    series: [
+      {name: '销售收入额', type: 'bar', data: md.revenue, itemStyle: {color: '#58a6ff', borderRadius: [4,4,0,0]}, barMaxWidth: 36},
+      {name: '毛利', type: 'bar', data: md.profit, itemStyle: {color: '#3fb950', borderRadius: [4,4,0,0]}, barMaxWidth: 36}
+    ]
+  });
+  
+  initChart('c2', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'axis', formatter: function(p){return p[0].name + '<br/>毛利率: ' + p[0].value + '%'}},
+    grid: {left: 60, right: 20, bottom: 30, top: 20},
+    xAxis: {type: 'category', data: md.months, axisLabel: {color: '#8b949e', fontSize: 10, rotate: 30}, axisLine: {lineStyle: {color: '#30363d'}}},
+    yAxis: {type: 'value', min: 0, max: 100, axisLabel: {color: '#8b949e', fontSize: 10, formatter: function(v){return v + '%'}}, splitLine: {lineStyle: {color: '#21262d'}}},
+    series: [{type: 'line', data: md.margin, smooth: true, symbol: 'circle', symbolSize: 7, lineStyle: {color: '#d29922', width: 2}, areaStyle: {color: {type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{offset: 0, color: 'rgba(210,153,34,.25)'}, {offset: 1, color: 'rgba(210,153,34,0)'}]}}, itemStyle: {color: '#d29922'}, markLine: {data: [{yAxis: 50, label: {formatter: '基准50%'}, lineStyle: {color: '#30363d', type: 'dashed'}}]}}]
+  });
+  
+  initChart('c3', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'axis', axisPointer: {type: 'cross'}},
+    legend: {data: ['销售收入额', '毛利率'], textStyle: {color: '#8b949e'}, bottom: 0},
+    grid: {left: 60, right: 60, bottom: 30, top: 20},
+    xAxis: {type: 'category', data: md.months, axisLabel: {color: '#8b949e', fontSize: 10, rotate: 30}, axisLine: {lineStyle: {color: '#30363d'}}},
+    yAxis: [{type: 'value', axisLabel: {color: '#8b949e', fontSize: 10, formatter: function(v){return v >= 10000 ? Math.round(v/10000) + '万' : v}}, splitLine: {lineStyle: {color: '#21262d'}}}, {type: 'value', min: 0, max: 100, axisLabel: {color: '#d29922', fontSize: 10, formatter: function(v){return v + '%'}}, splitLine: {show: false}}],
+    series: [{name: '销售收入额', type: 'bar', data: md.revenue, itemStyle: {color: '#58a6ff', borderRadius: [4,4,0,0]}, barMaxWidth: 28}, {name: '毛利率', type: 'line', yAxisIndex: 1, data: md.margin, smooth: true, symbol: 'diamond', symbolSize: 9, lineStyle: {color: '#d29922', width: 2}, itemStyle: {color: '#d29922'}}]
+  });
+  
+  var qData = {};
+  md.months.forEach(function(m, i) {
+    var q = m.substring(0,4) + 'Q' + (Math.ceil(parseInt(m.substring(5,7))/3));
+    qData[q] = (qData[q] || 0) + md.revenue[i];
+  });
+  var qPieData = Object.keys(qData).sort().map(function(k) { return {name: k, value: Math.round(qData[k])}; });
+  initChart('c4', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'item', formatter: function(p){return p.name + ': ¥' + fmt(p.value) + ' (' + p.percent + '%)'}},
+    series: [{type: 'pie', radius: ['45%', '70%'], data: qPieData, label: {color: '#8b949e', fontSize: 11}, labelLine: {lineStyle: {color: '#30363d'}}, itemStyle: {borderColor: '#161b22', borderWidth: 2}, color: ['#58a6ff', '#3fb950', '#d29922', '#f85149']}]
+  });
+  
+  var p5Data = pd.top5.map(function(p) { return {name: p.name, value: p.revenue}; });
+  p5Data.push({name: '其他', value: pd.other});
+  initChart('c5', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'item', formatter: function(p){return p.name + ': ¥' + fmt(p.value) + ' (' + p.percent + '%)'}},
+    series: [{type: 'pie', radius: ['45%', '70%'], data: p5Data, label: {color: '#8b949e', fontSize: 10}, labelLine: {lineStyle: {color: '#30363d'}}, itemStyle: {borderColor: '#161b22', borderWidth: 2}, color: ['#58a6ff', '#3fb950', '#d29922', '#f85149', '#a371f7', '#30363d']}]
+  });
+  
+  var achHtml = '';
+  var q2 = td.quarters['Q2'] || {target: 40, actual: 0, rate: 0, prof_target: 30, prof_actual: 0, prof_rate: 0};
+  achHtml += '<div class="stat-card purple"><div class="label">▶ 当前营收达成额</div><div class="value xl">' + fmt(q2.actual) + ' 万元</div><div class="sub">实际 ' + fmt(q2.actual) + '万 / 目标 ' + q2.target + '万</div></div>';
+  achHtml += '<div class="stat-card"><div class="label">▶ 当前毛利达成额</div><div class="value xl">' + fmt(q2.prof_actual) + ' 万元</div><div class="sub">实际 ' + fmt(q2.prof_actual) + '万 / 目标 ' + q2.prof_target + '万</div></div>';
+  achHtml += '<div class="stat-card green"><div class="label">▶ 当前营收达成率</div><div class="value xl">' + pct(q2.rate) + '</div><div class="sub">实际 ' + fmt(q2.actual) + '万 / 目标 ' + q2.target + '万</div></div>';
+  achHtml += '<div class="stat-card red"><div class="label">▶ 当前毛利达成率</div><div class="value xl">' + pct(q2.prof_rate) + '</div><div class="sub">实际 ' + fmt(q2.prof_actual) + '万 / 目标 ' + q2.prof_target + '万</div></div>';
+  document.getElementById('achGauges').innerHTML = achHtml;
+  
+  var momYoyHtml = '';
+  var mom = td.mom || {};
+  var yoy = td.yoy || {};
+  var ytd = td.ytd || {};
+  
+  var momRevStr = mom.revenue !== null && mom.revenue !== undefined ? (mom.revenue >= 0 ? '+' : '') + mom.revenue + '%' : 'N/A';
+  var momProfStr = mom.profit !== null && mom.profit !== undefined ? (mom.profit >= 0 ? '+' : '') + mom.profit + '%' : 'N/A';
+  var yoyRevStr = yoy.revenue !== null && yoy.revenue !== undefined ? (yoy.revenue >= 0 ? '+' : '') + yoy.revenue + '%' : 'N/A';
+  var yoyProfStr = yoy.profit !== null && yoy.profit !== undefined ? (yoy.profit >= 0 ? '+' : '') + yoy.profit + '%' : 'N/A';
+  
+  momYoyHtml += '<div class="stat-card"><div class="label">▶ 营收环比增长率</div><div class="value">' + momRevStr + '</div><div class="sub">' + (mom.label || '') + '</div></div>';
+  momYoyHtml += '<div class="stat-card yellow"><div class="label">▶ 毛利环比增长率</div><div class="value">' + momProfStr + '</div><div class="sub">' + (mom.label || '') + '</div></div>';
+  momYoyHtml += '<div class="stat-card purple"><div class="label">▶ 营收同比增长率</div><div class="value">' + yoyRevStr + '</div><div class="sub">' + (yoy.label || '') + '</div></div>';
+  momYoyHtml += '<div class="stat-card"><div class="label">▶ 毛利同比增长率</div><div class="value">' + yoyProfStr + '</div><div class="sub">' + (yoy.label || '') + '</div></div>';
+  
+  var ytdRevGrowthStr = ytd.revenue_growth !== null && ytd.revenue_growth !== undefined ? (ytd.revenue_growth >= 0 ? '+' : '') + ytd.revenue_growth + '%' : 'N/A';
+  var ytdProfGrowthStr = ytd.profit_growth !== null && ytd.profit_growth !== undefined ? (ytd.profit_growth >= 0 ? '+' : '') + ytd.profit_growth + '%' : 'N/A';
+  momYoyHtml += '<div class="stat-card green"><div class="label">▶ 年度累计营收</div><div class="value">' + fmt(ytd.rev_2026 || 0) + ' 万</div><div class="sub">增长 ' + ytdRevGrowthStr + '</div></div>';
+  momYoyHtml += '<div class="stat-card red"><div class="label">▶ 年度累计毛利</div><div class="value">' + fmt(ytd.prof_2026 || 0) + ' 万</div><div class="sub">增长 ' + ytdProfGrowthStr + '</div></div>';
+  
+  document.getElementById('achMomYoy').innerHTML = momYoyHtml;
+  
+  var qLabels = ['Q1', 'Q2', 'Q3', 'Q4'];
+  var quarters = td.quarters || {};
+  initChart('c9', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'axis'},
+    legend: {data: ['目标', '实际'], textStyle: {color: '#8b949e'}, bottom: 0},
+    grid: {left: 60, right: 20, bottom: 40, top: 20},
+    xAxis: {type: 'category', data: qLabels, axisLabel: {color: '#8b949e', fontSize: 12}, axisLine: {lineStyle: {color: '#30363d'}}},
+    yAxis: {type: 'value', axisLabel: {color: '#8b949e', fontSize: 10, formatter: function(v){return v + '万'}}, splitLine: {lineStyle: {color: '#21262d'}}},
+    series: [
+      {name: '目标', type: 'bar', data: qLabels.map(function(q){return (quarters[q]||{}).target||0}), itemStyle: {color: '#30363d', borderRadius: [4,4,0,0]}, barMaxWidth: 40},
+      {name: '实际', type: 'bar', data: qLabels.map(function(q){return (quarters[q]||{}).actual||0}), itemStyle: {color: '#58a6ff', borderRadius: [4,4,0,0]}, barMaxWidth: 40}
+    ]
+  });
+  
+  initChart('c10', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'axis', formatter: function(p){return p[0].name + '<br/>达成率: ' + p[0].value + '%'}},
+    grid: {left: 60, right: 20, bottom: 30, top: 20},
+    xAxis: {type: 'category', data: qLabels, axisLabel: {color: '#8b949e', fontSize: 12}, axisLine: {lineStyle: {color: '#30363d'}}},
+    yAxis: {type: 'value', min: 0, max: 120, axisLabel: {color: '#8b949e', fontSize: 10, formatter: function(v){return v + '%'}}, splitLine: {lineStyle: {color: '#21262d'}}},
+    series: [{type: 'line', data: qLabels.map(function(q){return (quarters[q]||{}).rate||0}), smooth: true, symbol: 'circle', symbolSize: 9, lineStyle: {color: '#3fb950', width: 3}, areaStyle: {color: {type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{offset: 0, color: 'rgba(63,185,80,.25)'}, {offset: 1, color: 'rgba(63,185,80,0)'}]}}, itemStyle: {color: '#3fb950'}, markLine: {data: [{yAxis: 100, label: {formatter: '目标'}, lineStyle: {color: '#30363d', type: 'dashed'}}]}}]
+  });
+  
+  var rev25 = 0, prof25 = 0;
+  md.months.forEach(function(m, i) { if (m.startsWith('2025')) { rev25 += md.revenue[i]; prof25 += md.profit[i]; } });
+  var rev26 = 0, prof26 = 0;
+  md.months.forEach(function(m, i) { if (m.startsWith('2026')) { rev26 += md.revenue[i]; prof26 += md.profit[i]; } });
+  initChart('c11', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'axis'},
+    legend: {data: ['销售收入额', '毛利', '毛利率'], textStyle: {color: '#8b949e'}, bottom: 0},
+    grid: {left: 60, right: 50, bottom: 40, top: 20},
+    xAxis: {type: 'category', data: ['2025', '2026'], axisLabel: {color: '#8b949e', fontSize: 14, fontWeight: 700}, axisLine: {lineStyle: {color: '#30363d'}}},
+    yAxis: [{type: 'value', name: '万元', nameTextStyle: {color: '#8b949e', fontSize: 10}, axisLabel: {color: '#8b949e', fontSize: 10}, splitLine: {lineStyle: {color: '#21262d'}}}, {type: 'value', min: 0, max: 100, axisLabel: {color: '#d29922', fontSize: 10, formatter: function(v){return v + '%'}}, splitLine: {show: false}}],
+    series: [
+      {name: '销售收入额', type: 'bar', data: [Math.round(rev25/10000*100)/100, Math.round(rev26/10000*100)/100], itemStyle: {color: '#58a6ff', borderRadius: [4,4,0,0]}, barMaxWidth: 55},
+      {name: '毛利', type: 'bar', data: [Math.round(prof25/10000*100)/100, Math.round(prof26/10000*100)/100], itemStyle: {color: '#3fb950', borderRadius: [4,4,0,0]}, barMaxWidth: 55},
+      {name: '毛利率', type: 'line', yAxisIndex: 1, data: [rev25>0?Math.round(prof25/rev25*1000)/10:0, rev26>0?Math.round(prof26/rev26*1000)/10:0], smooth: true, symbol: 'diamond', symbolSize: 11, lineStyle: {color: '#d29922', width: 2}, itemStyle: {color: '#d29922'}}
+    ]
+  });
+  
+  var bizPieData = bd.map(function(b) { return {name: b.name, value: b.revenue}; });
+  initChart('c12', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'item', formatter: function(p){return p.name + ': ¥' + fmt(p.value) + ' (' + p.percent + '%)'}},
+    series: [{type: 'pie', radius: ['45%', '70%'], data: bizPieData, label: {color: '#8b949e', fontSize: 11}, labelLine: {lineStyle: {color: '#30363d'}}, itemStyle: {borderColor: '#161b22', borderWidth: 2}, color: ['#58a6ff', '#3fb950']}]
+  });
+  
+  initChart('c13', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'axis'},
+    grid: {left: 60, right: 20, bottom: 30, top: 20},
+    xAxis: {type: 'category', data: bd.map(function(b){return b.name}), axisLabel: {color: '#8b949e', fontSize: 11}, axisLine: {lineStyle: {color: '#30363d'}}},
+    yAxis: {type: 'value', min: 0, max: 100, axisLabel: {color: '#8b949e', fontSize: 10, formatter: function(v){return v + '%'}}, splitLine: {lineStyle: {color: '#21262d'}}},
+    series: [{type: 'bar', data: bd.map(function(b){return b.margin}), itemStyle: {color: function(p){return p.value >= 70 ? '#3fb950' : p.value >= 50 ? '#d29922' : '#f85149'}, borderRadius: [4,4,0,0]}, barMaxWidth: 80, label: {show: true, position: 'top', formatter: function(p){return p.value + '%'}, color: '#8b949e', fontSize: 13, fontWeight: 600}}]
+  });
+  
+  var p10Names = pd.top10.map(function(p){return p.name});
+  var p10Revs = pd.top10.map(function(p){return p.revenue});
+  var p10Total = p10Revs.reduce(function(a,b){return a+b}, 0);
+  var cum = 0;
+  var cumData = p10Revs.map(function(r){cum += r; return Math.round(cum/p10Total*1000)/10});
+  initChart('c14', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'axis', axisPointer: {type: 'cross'}},
+    grid: {left: 60, right: 60, bottom: 50, top: 20},
+    xAxis: {type: 'category', data: p10Names, axisLabel: {color: '#8b949e', fontSize: 9, rotate: 35}, axisLine: {lineStyle: {color: '#30363d'}}},
+    yAxis: [{type: 'value', axisLabel: {color: '#8b949e', fontSize: 9}, splitLine: {lineStyle: {color: '#21262d'}}}, {type: 'value', min: 0, max: 100, axisLabel: {color: '#d29922', fontSize: 9, formatter: function(v){return v + '%'}}, splitLine: {show: false}}],
+    series: [{name: '销售收入额', type: 'bar', data: p10Revs, itemStyle: {color: '#58a6ff', borderRadius: [4,4,0,0]}, barMaxWidth: 30}, {name: '累计%', type: 'line', yAxisIndex: 1, data: cumData, smooth: true, symbol: 'circle', symbolSize: 7, lineStyle: {color: '#d29922', width: 2}, itemStyle: {color: '#d29922'}, markLine: {data: [{yAxis: 80, label: {formatter: '80%'}, lineStyle: {color: '#f85149', type: 'dashed'}}]}}]
+  });
+  
+  initChart('c15', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'axis'},
+    legend: {data: ['销售收入额', '毛利'], textStyle: {color: '#8b949e'}, bottom: 0},
+    grid: {left: 60, right: 20, bottom: 40, top: 20},
+    xAxis: {type: 'category', data: md.months, axisLabel: {color: '#8b949e', fontSize: 10, rotate: 30}, axisLine: {lineStyle: {color: '#30363d'}}},
+    yAxis: {type: 'value', axisLabel: {color: '#8b949e', fontSize: 9, formatter: function(v){return v >= 10000 ? Math.round(v/10000) + '万' : v}}, splitLine: {lineStyle: {color: '#21262d'}}},
+    series: [
+      {name: '销售收入额', type: 'line', data: md.revenue, smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: {color: '#58a6ff', width: 2}, areaStyle: {color: {type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{offset: 0, color: 'rgba(88,166,255,.2)'}, {offset: 1, color: 'rgba(88,166,255,0)'}]}}, itemStyle: {color: '#58a6ff'}},
+      {name: '毛利', type: 'line', data: md.profit, smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: {color: '#3fb950', width: 2}, areaStyle: {color: {type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{offset: 0, color: 'rgba(63,185,128,.2)'}, {offset: 1, color: 'rgba(63,185,128,0)'}]}}, itemStyle: {color: '#3fb950'}}
+    ]
+  });
+  
+  var custTop10 = cd.slice(0, 10);
+  var custTotal = cd.reduce(function(s,c){return s+c.revenue}, 0);
+  var custCum = 0;
+  var custCumData = custTop10.map(function(c){custCum += c.revenue; return Math.round(custCum/custTotal*1000)/10});
+  initChart('c19', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'axis', axisPointer: {type: 'cross'}, formatter: function(p){
+      var idx = p[0].dataIndex;
+      var c = custTop10[idx];
+      return '<strong>' + c.name + '</strong><br/>销售收入额: ¥' + fmt(Math.round(c.revenue)) + '<br/>利润额: ¥' + fmt(Math.round(c.profit)) + '<br/>毛利率: ' + c.margin + '%<br/>占比: ' + c.pct + '%';
+    }},
+    legend: {data: ['销售收入额', '利润额', '累计占比'], textStyle: {color: '#8b949e'}, bottom: 0},
+    grid: {left: 70, right: 70, bottom: 50, top: 20},
+    xAxis: {type: 'category', data: custTop10.map(function(c){return c.name}), axisLabel: {color: '#8b949e', fontSize: 9, rotate: 35}, axisLine: {lineStyle: {color: '#30363d'}}},
+    yAxis: [{type: 'value', axisLabel: {color: '#8b949e', fontSize: 9, formatter: function(v){return v >= 10000 ? Math.round(v/10000) + '万' : v}}, splitLine: {lineStyle: {color: '#21262d'}}}, {type: 'value', min: 0, max: 100, axisLabel: {color: '#d29922', fontSize: 9, formatter: function(v){return v + '%'}}, splitLine: {show: false}}],
+    series: [
+      {name: '销售收入额', type: 'bar', data: custTop10.map(function(c){return c.revenue}), itemStyle: {color: '#58a6ff', borderRadius: [4,4,0,0]}, barMaxWidth: 30},
+      {name: '利润额', type: 'bar', data: custTop10.map(function(c){return c.profit}), itemStyle: {color: '#3fb950', borderRadius: [4,4,0,0]}, barMaxWidth: 30},
+      {name: '累计占比', type: 'line', yAxisIndex: 1, data: custCumData, smooth: true, symbol: 'circle', symbolSize: 7, lineStyle: {color: '#d29922', width: 2}, itemStyle: {color: '#d29922'}, markLine: {data: [{yAxis: 80, label: {formatter: '80%'}, lineStyle: {color: '#f85149', type: 'dashed'}}]}}
+    ]
+  });
+  
+  var cHtml = '<table><thead><tr>';
+  cHtml += '<th class="center">排名</th><th>客户名称</th><th class="right">销售收入额</th><th class="right">利润额</th><th class="right">毛利率</th><th class="right">占比</th>';
+  cHtml += '</tr></thead><tbody>';
+  cd.forEach(function(c, i) {
+    var rank = i + 1;
+    var rankClass = rank <= 3 ? 'rank-' + rank : '';
+    var marginClass = c.margin >= 70 ? 'green' : c.margin >= 50 ? 'yellow' : 'red';
+    cHtml += '<tr><td class="center ' + rankClass + '">' + rank + '</td><td>' + c.name + '</td><td class="right" style="font-weight:600">¥' + fmt(Math.round(c.revenue)) + '</td><td class="right ' + (c.profit >= 0 ? 'green' : 'red') + '">¥' + fmt(Math.round(c.profit)) + '</td><td class="right ' + marginClass + '">' + c.margin + '%</td><td class="right yellow">' + c.pct + '%</td></tr>';
+  });
+  cHtml += '</tbody></table>';
+  document.getElementById('customerTable').innerHTML = cHtml;
+  
+  fetch(API_BASE + '/api/products?limit=30', {headers: {'Authorization': 'Bearer ' + authToken}}).then(function(r){return r.json()}).then(function(pData){
+    var pqData = pData.products.map(function(p){return {name: p.name, value: [p.revenue, p.margin, 1], rev: p.revenue, margin: p.margin}});
+    var medRev = pqData.length > 1 ? pqData[Math.floor(pqData.length/2)].rev : 0;
+    var margins = pqData.map(function(d){return d.margin}).sort(function(a,b){return a-b});
+    var medMarg = margins.length > 1 ? margins[Math.floor(margins.length/2)] : 50;
+    
+    initChart('c16', {
+      backgroundColor: 'transparent',
+      tooltip: {trigger: 'item', formatter: function(p){var d = p.data; return '<strong>' + d.name + '</strong><br/>销售收入额: ¥' + fmt(d.rev) + '<br/>毛利率: ' + d.margin + '%'}},
+      grid: {left: 70, right: 40, bottom: 40, top: 20},
+      xAxis: {type: 'value', axisLabel: {color: '#8b949e', fontSize: 9, formatter: function(v){return v >= 10000 ? Math.round(v/10000) + '万' : v}}, splitLine: {lineStyle: {color: '#21262d'}}},
+      yAxis: {type: 'value', min: 0, max: 100, axisLabel: {color: '#8b949e', fontSize: 9, formatter: function(v){return v + '%'}}, splitLine: {lineStyle: {color: '#21262d'}}},
+      series: [{
+        type: 'scatter', data: pqData, symbolSize: 20,
+        itemStyle: {color: function(d){var r = d.data.rev, m = d.data.margin; return r >= medRev && m >= medMarg ? '#3fb950' : r >= medRev && m < medMarg ? '#d29922' : r < medRev && m >= medMarg ? '#58a6ff' : '#f85149'}},
+        label: {show: true, formatter: function(p){return p.data.name}, color: '#e6edf3', fontSize: 8, position: 'top'},
+        markLine: {silent: true, data: [{xAxis: medRev, label: {show: true, formatter: '销售收入额中位', color: '#8b949e', fontSize: 9}, lineStyle: {color: '#30363d', type: 'dashed'}}, {yAxis: medMarg, label: {show: true, formatter: '毛利率中位', color: '#8b949e', fontSize: 9}, lineStyle: {color: '#30363d', type: 'dashed'}}]}
+      }],
+      graphic: [
+        {type: 'text', left: '67%', top: '14%', style: {text: '明 星 产 品', fill: '#3fb950', fontSize: 14, fontWeight: 'bold'}},
+        {type: 'text', left: '67%', top: '72%', style: {text: '金 牛 产 品', fill: '#d29922', fontSize: 14, fontWeight: 'bold'}},
+        {type: 'text', left: '2%', top: '14%', style: {text: '潜 力 产 品', fill: '#58a6ff', fontSize: 14, fontWeight: 'bold'}},
+        {type: 'text', left: '2%', top: '72%', style: {text: '瘦 狗 产 品', fill: '#f85149', fontSize: 14, fontWeight: 'bold'}}
+      ]
+    });
+  });
+  
+  var p10Profits = pd.top10.map(function(p){return p.profit});
+  initChart('c17', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'axis'},
+    grid: {left: 70, right: 30, bottom: 50, top: 20},
+    xAxis: {type: 'category', data: p10Names, axisLabel: {color: '#8b949e', fontSize: 9, rotate: 30}, axisLine: {lineStyle: {color: '#30363d'}}},
+    yAxis: {type: 'value', axisLabel: {color: '#8b949e', fontSize: 9, formatter: function(v){return v >= 10000 ? Math.round(v/10000) + '万' : v}}, splitLine: {lineStyle: {color: '#21262d'}}},
+    series: [{type: 'bar', data: p10Profits, itemStyle: {color: function(d){return d.value >= 5000 ? '#3fb950' : d.value >= 2000 ? '#58a6ff' : '#d29922'}, borderRadius: [4,4,0,0]}, barMaxWidth: 36, label: {show: true, position: 'top', formatter: function(p){return Math.round(p.value/10000*100)/100 + '万'}, color: '#8b949e', fontSize: 9}}]
+  });
+  
+  var marginDist = {'<20%': 0, '20-40%': 0, '40-60%': 0, '60-80%': 0, '80%+': 0};
+  pd.top10.forEach(function(p){
+    if (p.margin < 20) marginDist['<20%']++;
+    else if (p.margin < 40) marginDist['20-40%']++;
+    else if (p.margin < 60) marginDist['40-60%']++;
+    else if (p.margin < 80) marginDist['60-80%']++;
+    else marginDist['80%+']++;
+  });
+  initChart('c18', {
+    backgroundColor: 'transparent',
+    tooltip: {trigger: 'item', formatter: function(p){return p.name + ': ' + p.value + ' (' + p.percent + '%)'}},
+    series: [{type: 'pie', radius: ['40%', '70%'], data: Object.keys(marginDist).map(function(k){return {name: k, value: marginDist[k]}}), label: {color: '#8b949e', fontSize: 11}, labelLine: {lineStyle: {color: '#30363d'}}, itemStyle: {borderColor: '#161b22', borderWidth: 2}, color: ['#f85149', '#d29922', '#58a6ff', '#3fb950', '#1f6feb']}]
+  });
+}
+
+async function loadData() {
+  document.getElementById('status').textContent = '加载中...';
+  try {
+    var url = API_BASE + '/api/dashboard-data';
+    var params = [];
+    if (state.year !== 'all') params.push('year=' + state.year);
+    if (state.quarter !== 'all') params.push('quarter=' + state.quarter);
+    if (params.length) url += '?' + params.join('&');
+    
+    var resp = await fetch(url, {
+      headers: {'Authorization': 'Bearer ' + authToken}
+    });
+    
+    if (resp.status === 401) {
+      showLoginPage();
+      return;
+    }
+    
+    allData = await resp.json();
+    renderAll();
+    document.getElementById('status').textContent = '数据已加载 ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('status').textContent = '加载失败: ' + e.message;
+  }
+}
+
+document.querySelector('.filters').addEventListener('click', function(e) {
+  var btn = e.target.closest('.filter-btn');
+  if (!btn) return;
+  var group = btn.getAttribute('data-group');
+  var value = btn.getAttribute('data-value');
+  state[group] = value;
+  document.querySelectorAll('.filter-btn[data-group="' + group + '"]').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  loadData();
+});
+
+document.getElementById('mainNav').addEventListener('click', function(e) {
+  var link = e.target.closest('a');
+  if (!link) return;
+  e.preventDefault();
+  document.querySelectorAll('.nav a').forEach(function(a) { a.classList.remove('active'); });
+  link.classList.add('active');
+  var target = document.querySelector(link.getAttribute('href'));
+  if (target) target.scrollIntoView({behavior: 'smooth'});
+});
+
+window.addEventListener('resize', function() {
+  Object.values(charts).forEach(function(chart) { if (chart && chart.resize) chart.resize(); });
+});
+
+// 初始化：检查登录状态
+checkLogin();
+</script>
+</body>
+</html>
