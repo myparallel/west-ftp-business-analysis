@@ -9,7 +9,10 @@
 <script>
   // 初始化EmailJS
   (function(){
-    emailjs.init("6NcSzlD8hf9peLCzt");
+    emailjs.init({
+      publicKey: "6NcSzlD8hf9peLCzt",
+      privateKey: "LFPQ••••••••••••••••"  // Private Key
+    });
   })();
 </script>
 <style>
@@ -160,6 +163,13 @@ td{padding:7px 5px;border-bottom:1px solid var(--border);white-space:nowrap}
       <button class="resend-btn" onclick="showEmailStep()" style="margin-top:8px">返回登录</button>
       <div class="login-error" id="applyError"></div>
       <div id="applySuccess" style="display:none;font-size:13px;color:var(--green);margin-top:8px"></div>
+    </div>
+    
+    <!-- 管理员审核页面（默认隐藏） -->
+    <div class="login-form" id="adminStep" style="display:none">
+      <div style="font-size:14px;color:var(--blue);margin-bottom:12px;font-weight:600">管理员审核</div>
+      <div id="adminAppList" style="margin-bottom:12px;font-size:12px;color:var(--text2)">加载中...</div>
+      <button class="resend-btn" onclick="showEmailStep()" style="margin-top:8px">返回登录</button>
     </div>
     
     <div class="login-footer">内部系统，仅限授权人员使用</div>
@@ -351,6 +361,13 @@ function showLoginPage() {
 }
 
 function showMainPage() {
+  // 检查是否需要跳转到审核页面
+  if (window._afterLogin === 'admin') {
+    window._afterLogin = null;
+    showAdminStep();
+    return;
+  }
+  
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('mainPage').style.display = 'block';
   document.getElementById('userEmail').textContent = userEmail;
@@ -559,19 +576,24 @@ async function handleApply() {
   
   try {
     // 使用EmailJS发送邮件到管理员
+    // 注意：需要在EmailJS模板中设置收件人为 davidliu@west-hn.com
     var templateParams = {
       to_name: '管理员',
-      to_email: 'davidliu@west-hn.com',
+      to_email: 'davidliu@west-hn.com',  // 这个参数需要在模板中使用
       from_name: name,
       from_email: email,
-      message: '申请人：' + name + '\n邮箱：' + email + '\n理由：' + reason
+      message: '申请人：' + name + '\n邮箱：' + email + '\n理由：' + reason + '\n\n点击审核：https://myparallel.github.io/west-ftp-business-analysis/?admin=1'
     };
+    
+    console.log('发送邮件参数:', templateParams);
     
     var response = await emailjs.send(
       'service_qk4mu0o',
       'template_1q7o0mx',
       templateParams
     );
+    
+    console.log('邮件发送响应:', response);
     
     if (response.status === 200) {
       successEl.textContent = '✓ 申请已提交，请等待管理员审核';
@@ -588,6 +610,95 @@ async function handleApply() {
   } finally {
     btnEl.disabled = false;
     btnEl.textContent = '提交申请';
+  }
+}
+
+// ============================================================
+//  管理员审核功能
+// ============================================================
+function showAdminStep() {
+  document.getElementById('emailStep').style.display = 'none';
+  document.getElementById('codeStep').style.display = 'none';
+  document.getElementById('applyStep').style.display = 'none';
+  document.getElementById('adminStep').style.display = 'flex';
+  document.getElementById('loginSubtitle').textContent = '管理员审核';
+  loadApplications();
+}
+
+async function loadApplications() {
+  var listEl = document.getElementById('adminAppList');
+  listEl.textContent = '加载中...';
+  
+  // 如果已登录，直接加载
+  if (authToken) {
+    try {
+      var resp = await fetch(API_BASE + '/api/admin/applications', {
+        headers: {'Authorization': 'Bearer ' + authToken}
+      });
+      var data = await resp.json();
+      
+      if (data.applications && data.applications.length > 0) {
+        var html = '';
+        data.applications.forEach(function(app) {
+          html += '<div style="padding:8px;margin-bottom:6px;background:#21262d;border-radius:6px">';
+          html += '<div style="font-weight:600;color:var(--text)">' + app.name + '</div>';
+          html += '<div style="color:var(--blue)">' + app.email + '</div>';
+          html += '<div style="color:var(--text2)">' + app.reason + '</div>';
+          html += '<div style="font-size:10px;color:var(--text2)">' + app.time + '</div>';
+          html += '<button onclick="approveEmail(\'' + app.email + '\')" style="margin-top:6px;padding:4px 12px;font-size:11px;border:1px solid #3fb950;border-radius:4px;background:transparent;color:#3fb950;cursor:pointer">批准</button>';
+          html += '</div>';
+        });
+        listEl.innerHTML = html;
+      } else {
+        listEl.innerHTML = '<div style="color:var(--text2)">暂无待审核申请</div>';
+      }
+    } catch (e) {
+      listEl.textContent = '加载失败：' + e.message;
+    }
+    return;
+  }
+  
+  // 未登录时，让用户先登录
+  listEl.innerHTML = '<div style="color:var(--text2)">请先<a href="#" onclick="showEmailStep()" style="color:var(--blue);text-decoration:none">登录</a>管理员账号</div>';
+}
+
+async function approveEmail(email) {
+  if (!authToken) {
+    alert('请先登录管理员账号');
+    return;
+  }
+  
+  try {
+    var resp = await fetch(API_BASE + '/api/admin/approve?email=' + encodeURIComponent(email), {
+      method: 'POST',
+      headers: {'Authorization': 'Bearer ' + authToken}
+    });
+    var data = await resp.json();
+    
+    if (resp.ok && data.success) {
+      alert('✓ 已批准 ' + email);
+      loadApplications();
+    } else {
+      alert('操作失败：' + (data.detail || '未知错误'));
+    }
+  } catch (e) {
+    alert('操作失败：' + e.message);
+  }
+}
+
+// 检查URL参数，自动进入审核页面
+function checkAdminUrl() {
+  var urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('admin') === '1') {
+    // 如果已有token，直接显示审核页面
+    if (authToken) {
+      showAdminStep();
+    } else {
+      // 先登录，登录后自动跳转审核页面
+      showLoginPage();
+      // 标记登录后跳转到审核页面
+      window._afterLogin = 'admin';
+    }
   }
 }
 
@@ -939,6 +1050,7 @@ window.addEventListener('resize', function() {
 
 // 初始化：检查登录状态
 checkLogin();
+checkAdminUrl();
 </script>
 </body>
 </html>
