@@ -167,9 +167,14 @@ td{padding:7px 5px;border-bottom:1px solid var(--border);white-space:nowrap}
     
     <!-- 管理员审核页面（默认隐藏） -->
     <div class="login-form" id="adminStep" style="display:none">
-      <div style="font-size:14px;color:var(--blue);margin-bottom:12px;font-weight:600">管理员审核</div>
-      <div id="adminAppList" style="margin-bottom:12px;font-size:12px;color:var(--text2)">加载中...</div>
-      <button class="resend-btn" onclick="showEmailStep()" style="margin-top:8px">返回登录</button>
+      <div style="font-size:14px;color:var(--blue);margin-bottom:12px;font-weight:600">添加许可邮箱</div>
+      <input type="email" class="login-input" id="adminEmailInput" placeholder="输入申请人邮箱" autocomplete="email">
+      <button class="login-btn" onclick="adminApprove()">添加到许可名单</button>
+      <div class="login-error" id="adminError"></div>
+      <div id="adminSuccess" style="display:none;font-size:13px;color:var(--green);margin-top:8px"></div>
+      <div style="margin-top:16px;font-size:12px;color:var(--text2)">
+        <a href="#" onclick="showEmailStep()" style="color:var(--blue);text-decoration:none">返回登录</a>
+      </div>
     </div>
     
     <div class="login-footer">内部系统，仅限授权人员使用</div>
@@ -614,75 +619,47 @@ async function handleApply() {
 }
 
 // ============================================================
-//  管理员审核功能
+//  管理员审核功能（无需登录）
 // ============================================================
 function showAdminStep() {
   document.getElementById('emailStep').style.display = 'none';
   document.getElementById('codeStep').style.display = 'none';
   document.getElementById('applyStep').style.display = 'none';
   document.getElementById('adminStep').style.display = 'flex';
-  document.getElementById('loginSubtitle').textContent = '管理员审核';
-  loadApplications();
+  document.getElementById('loginSubtitle').textContent = '管理员 - 添加许可邮箱';
+  document.getElementById('adminSuccess').style.display = 'none';
+  document.getElementById('adminError').textContent = '';
 }
 
-async function loadApplications() {
-  var listEl = document.getElementById('adminAppList');
-  listEl.textContent = '加载中...';
+async function adminApprove() {
+  var email = document.getElementById('adminEmailInput').value.trim();
+  var errorEl = document.getElementById('adminError');
+  var successEl = document.getElementById('adminSuccess');
   
-  // 如果已登录，直接加载
-  if (authToken) {
-    try {
-      var resp = await fetch(API_BASE + '/api/admin/applications', {
-        headers: {'Authorization': 'Bearer ' + authToken}
-      });
-      var data = await resp.json();
-      
-      if (data.applications && data.applications.length > 0) {
-        var html = '';
-        data.applications.forEach(function(app) {
-          html += '<div style="padding:8px;margin-bottom:6px;background:#21262d;border-radius:6px">';
-          html += '<div style="font-weight:600;color:var(--text)">' + app.name + '</div>';
-          html += '<div style="color:var(--blue)">' + app.email + '</div>';
-          html += '<div style="color:var(--text2)">' + app.reason + '</div>';
-          html += '<div style="font-size:10px;color:var(--text2)">' + app.time + '</div>';
-          html += '<button onclick="approveEmail(\'' + app.email + '\')" style="margin-top:6px;padding:4px 12px;font-size:11px;border:1px solid #3fb950;border-radius:4px;background:transparent;color:#3fb950;cursor:pointer">批准</button>';
-          html += '</div>';
-        });
-        listEl.innerHTML = html;
-      } else {
-        listEl.innerHTML = '<div style="color:var(--text2)">暂无待审核申请</div>';
-      }
-    } catch (e) {
-      listEl.textContent = '加载失败：' + e.message;
-    }
+  if (!email) {
+    errorEl.textContent = '请输入邮箱地址';
     return;
   }
   
-  // 未登录时，让用户先登录
-  listEl.innerHTML = '<div style="color:var(--text2)">请先<a href="#" onclick="showEmailStep()" style="color:var(--blue);text-decoration:none">登录</a>管理员账号</div>';
-}
-
-async function approveEmail(email) {
-  if (!authToken) {
-    alert('请先登录管理员账号');
-    return;
-  }
+  errorEl.textContent = '';
+  successEl.style.display = 'none';
   
   try {
     var resp = await fetch(API_BASE + '/api/admin/approve?email=' + encodeURIComponent(email), {
-      method: 'POST',
-      headers: {'Authorization': 'Bearer ' + authToken}
+      method: 'POST'
     });
+    
     var data = await resp.json();
     
     if (resp.ok && data.success) {
-      alert('✓ 已批准 ' + email);
-      loadApplications();
+      successEl.textContent = '✓ ' + email + ' 已添加到许可名单，现在可以登录';
+      successEl.style.display = 'block';
+      document.getElementById('adminEmailInput').value = '';
     } else {
-      alert('操作失败：' + (data.detail || '未知错误'));
+      errorEl.textContent = data.detail || '操作失败';
     }
   } catch (e) {
-    alert('操作失败：' + e.message);
+    errorEl.textContent = '连接失败：' + e.message;
   }
 }
 
@@ -690,15 +667,7 @@ async function approveEmail(email) {
 function checkAdminUrl() {
   var urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('admin') === '1') {
-    // 如果已有token，直接显示审核页面
-    if (authToken) {
-      showAdminStep();
-    } else {
-      // 先登录，登录后自动跳转审核页面
-      showLoginPage();
-      // 标记登录后跳转到审核页面
-      window._afterLogin = 'admin';
-    }
+    showAdminStep();
   }
 }
 
