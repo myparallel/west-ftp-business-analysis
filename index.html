@@ -558,12 +558,13 @@ async function handleApply() {
   successEl.style.display = 'none';
   
   try {
-    // 使用EmailJS发送邮件
+    // 使用EmailJS发送邮件到管理员
     var templateParams = {
+      to_name: '管理员',
+      to_email: 'davidliu@west-hn.com',
       from_name: name,
       from_email: email,
-      message: reason,
-      to_email: 'davidliu@west-hn.com'
+      message: '申请人：' + name + '\n邮箱：' + email + '\n理由：' + reason
     };
     
     var response = await emailjs.send(
