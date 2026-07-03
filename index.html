@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>分析看板</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script>
+  // 初始化EmailJS
+  (function(){
+    emailjs.init("6NcSzlD8hf9peLCzt");
+  })();
+</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0d1117;--card:#161b22;--border:#21262d;--text:#e6edf3;--text2:#8b949e;--blue:#58a6ff;--green:#3fb950;--yellow:#d29922;--red:#f85149;--purple:#a371f7}
@@ -118,6 +125,9 @@ td{padding:7px 5px;border-bottom:1px solid var(--border);white-space:nowrap}
       <input type="email" class="login-input" id="emailInput" placeholder="请输入邮箱地址" autocomplete="email">
       <button class="login-btn" id="sendCodeBtn" onclick="handleSendCode()">获取验证码</button>
       <div class="login-error" id="emailError"></div>
+      <div style="margin-top:16px;font-size:12px;color:var(--text2)">
+        没有权限？<a href="#" onclick="showApplyStep()" style="color:var(--blue);text-decoration:none">点击申请</a>
+      </div>
     </div>
     
     <!-- 步骤2：输入验证码（默认隐藏） -->
@@ -141,7 +151,18 @@ td{padding:7px 5px;border-bottom:1px solid var(--border);white-space:nowrap}
       <div class="login-error" id="codeError"></div>
     </div>
     
-    <div class="login-footer">如需授权请联系：davidliu@west-hn.com</div>
+    <!-- 申请表单（默认隐藏） -->
+    <div class="login-form" id="applyStep" style="display:none">
+      <input type="email" class="login-input" id="applyEmail" placeholder="您的邮箱地址" autocomplete="email">
+      <input type="text" class="login-input" id="applyName" placeholder="您的姓名">
+      <textarea class="login-input" id="applyReason" placeholder="申请理由（如：部门+职位）" rows="3" style="resize:vertical;min-height:60px"></textarea>
+      <button class="login-btn" id="applyBtn" onclick="handleApply()">提交申请</button>
+      <button class="resend-btn" onclick="showEmailStep()" style="margin-top:8px">返回登录</button>
+      <div class="login-error" id="applyError"></div>
+      <div id="applySuccess" style="display:none;font-size:13px;color:var(--green);margin-top:8px"></div>
+    </div>
+    
+    <div class="login-footer">内部系统，仅限授权人员使用</div>
   </div>
 </div>
 
@@ -494,6 +515,79 @@ function handleLogout() {
   localStorage.removeItem('authToken');
   localStorage.removeItem('userEmail');
   showLoginPage();
+}
+
+// ============================================================
+//  申请功能
+// ============================================================
+function showApplyStep() {
+  document.getElementById('emailStep').style.display = 'none';
+  document.getElementById('codeStep').style.display = 'none';
+  document.getElementById('applyStep').style.display = 'flex';
+  document.getElementById('step1').classList.add('active');
+  document.getElementById('step2').classList.remove('active');
+  document.getElementById('loginSubtitle').textContent = '申请访问权限';
+  document.getElementById('applySuccess').style.display = 'none';
+  document.getElementById('applyError').textContent = '';
+}
+
+async function handleApply() {
+  var email = document.getElementById('applyEmail').value.trim();
+  var name = document.getElementById('applyName').value.trim();
+  var reason = document.getElementById('applyReason').value.trim();
+  var errorEl = document.getElementById('applyError');
+  var successEl = document.getElementById('applySuccess');
+  var btnEl = document.getElementById('applyBtn');
+  
+  if (!email) {
+    errorEl.textContent = '请输入邮箱地址';
+    return;
+  }
+  if (!name) {
+    errorEl.textContent = '请输入姓名';
+    return;
+  }
+  if (!reason) {
+    errorEl.textContent = '请输入申请理由';
+    return;
+  }
+  
+  btnEl.disabled = true;
+  btnEl.textContent = '提交中...';
+  errorEl.textContent = '';
+  successEl.style.display = 'none';
+  
+  try {
+    // 使用EmailJS发送邮件
+    var templateParams = {
+      from_name: name,
+      from_email: email,
+      message: reason,
+      to_email: 'davidliu@west-hn.com'
+    };
+    
+    var response = await emailjs.send(
+      'service_m7tt91e',
+      'template_1q7o0mx',
+      templateParams
+    );
+    
+    if (response.status === 200) {
+      successEl.textContent = '✓ 申请已提交，请等待管理员审核';
+      successEl.style.display = 'block';
+      // 清空表单
+      document.getElementById('applyEmail').value = '';
+      document.getElementById('applyName').value = '';
+      document.getElementById('applyReason').value = '';
+    } else {
+      errorEl.textContent = '提交失败，请重试';
+    }
+  } catch (e) {
+    errorEl.textContent = '提交失败：' + (e.text || e.message || '请检查网络');
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = '提交申请';
+  }
 }
 
 // 回车键操作
