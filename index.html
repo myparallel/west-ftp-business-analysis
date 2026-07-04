@@ -435,17 +435,20 @@ async function handleSendCode() {
       
       // 用EmailJS发送验证码到用户邮箱（使用验证码专用模板）
       try {
-        await emailjs.send(
+        var emailResult = await emailjs.send(
           'service_qk4mu0o',
           'template_yxq1lus',
           {
-            to_name: email,
             to_email: email,
-            message: data.code
+            to_name: email,
+            passcode: data.code
           }
         );
+        console.log('EmailJS发送成功:', emailResult);
       } catch (e) {
-        console.log('EmailJS发送失败，但验证码已生成');
+        console.log('EmailJS发送失败:', e);
+        // 发送失败时显示验证码
+        alert('邮件发送失败，验证码是：' + data.code);
       }
       
       document.getElementById('maskedEmail').textContent = maskEmail(email);
