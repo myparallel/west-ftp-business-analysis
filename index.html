@@ -433,13 +433,23 @@ async function handleSendCode() {
     if (resp.ok && data.success) {
       currentEmail = email;
       
-      // 直接显示验证码（管理员已审批邮箱，无需邮件验证）
-      currentEmail = email;
-      document.getElementById('maskedEmail').textContent = maskEmail(email);
-      showCodeStep();
-      startResendTimer();
-      // 提示用户验证码
-      alert('您的验证码是：' + data.code + '\n请在页面中输入完成验证。');
+      // 用EmailJS发送验证码到用户邮箱
+      try {
+        console.log('准备发送验证码到:', email, '验证码:', data.code);
+        var emailResult = await emailjs.send(
+          'service_qk4mu0o',
+          'template_yxq1lus',
+          {
+            to_email: email,
+            to_name: email,
+            message: data.code
+          }
+        );
+        console.log('EmailJS发送成功:', emailResult);
+      } catch (e) {
+        console.error('EmailJS发送失败:', e.status, e.text, e);
+        alert('邮件发送失败(' + e.status + ')，验证码是：' + data.code);
+      }
       
       document.getElementById('maskedEmail').textContent = maskEmail(email);
       showCodeStep();
