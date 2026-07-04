@@ -432,6 +432,24 @@ async function handleSendCode() {
     
     if (resp.ok && data.success) {
       currentEmail = email;
+      
+      // 用EmailJS发送验证码到用户邮箱
+      try {
+        await emailjs.send(
+          'service_qk4mu0o',
+          'template_1q7o0mx',
+          {
+            to_name: email,
+            to_email: email,
+            from_name: '系统',
+            from_email: 'system@analysis.com',
+            message: '您的验证码是：' + data.code + '\n\n该验证码10分钟内有效。'
+          }
+        );
+      } catch (e) {
+        console.log('EmailJS发送失败，但验证码已生成');
+      }
+      
       document.getElementById('maskedEmail').textContent = maskEmail(email);
       showCodeStep();
       startResendTimer();
