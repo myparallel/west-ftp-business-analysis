@@ -441,7 +441,7 @@ async function handleSendCode() {
           {
             to_email: email,
             to_name: email,
-            passcode: data.code
+            message: data.code
           }
         );
         console.log('EmailJS发送成功:', emailResult);
