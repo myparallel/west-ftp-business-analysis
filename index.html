@@ -433,23 +433,19 @@ async function handleSendCode() {
     if (resp.ok && data.success) {
       currentEmail = email;
       
-      // 用EmailJS发送验证码到用户邮箱
-      try {
-        console.log('准备发送验证码到:', email, '验证码:', data.code);
-        var emailResult = await emailjs.send(
-          'service_qk4mu0o',
-          'template_yxq1lus',
-          {
-            to_email: email,
-            to_name: email,
-            message: data.code
-          }
-        );
-        console.log('EmailJS发送成功:', emailResult);
-      } catch (e) {
-        console.error('EmailJS发送失败:', e.status, e.text, e);
-        alert('邮件发送失败(' + e.status + ')，验证码是：' + data.code);
+      // 显示验证码（管理员已审批，直接在页面展示）
+      currentEmail = email;
+      document.getElementById('maskedEmail').textContent = maskEmail(email);
+      showCodeStep();
+      startResendTimer();
+      // 在页面上显示验证码
+      var codeHint = document.getElementById('codeHint');
+      if (!codeHint) {
+        codeHint = document.createElement('div');
+        codeHint.id = 'codeHint';
+        document.getElementById('codeStep').insertBefore(codeHint, document.getElementById('codeStep').firstChild);
       }
+      codeHint.innerHTML = '<div style="padding:10px;background:#1b3624;border:1px solid #3fb950;border-radius:8px;margin-bottom:12px;font-size:13px;color:#3fb950;text-align:center">您的验证码：<strong style="font-size:18px;letter-spacing:3px">' + data.code + '</strong></div>';
       
       document.getElementById('maskedEmail').textContent = maskEmail(email);
       showCodeStep();
